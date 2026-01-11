@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>System</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:Poppins}
+body{min-height:100vh;background:#f5f6f7;display:flex;justify-content:center;align-items:center}
+.wrapper{width:420px;background:white;padding:25px;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.15)}
+input,button,textarea{width:100%;padding:10px;margin-top:10px}
+button{background:#4caf50;color:#fff;border:none;border-radius:30px;cursor:pointer;font-weight:600}
+button.red{background:#e53935}
+button.gray{background:#777}
+#system,#workspace,#professionPage,#admin{display:none}
+
+.circle{position:relative;width:420px;height:420px;border-radius:50%;border:6px solid #f0b429;margin:auto}
+.profession{position:absolute;width:65px;height:65px;border-radius:50%;background:#fff;border:3px solid #ccc;
+display:flex;align-items:center;justify-content:center;font-size:10px;text-align:center;cursor:pointer;padding:4px}
+.profession.selected{border-color:#4caf50;background:#e8f5e9}
+
+.center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;gap:6px}
+.center div{padding:6px 14px;border-radius:20px;color:white;font-size:12px}
+.c1{background:#b35c3e}.c2{background:#4a7bd0}.c3{background:#777}.c4{background:#4caf50}
+
+.item{background:#fff;padding:12px;margin:8px 0;border-radius:8px;border-left:6px solid #4caf50;cursor:pointer}
+.small{font-size:12px;color:#555}
+
+body{
+ background:url(tumo.png) no-repeat center center;
+}
+
+/* ===== ДОБАВЛЕНО: ПОЛНЫЙ ЭКРАН ===== */
+.fullscreen{
+ width:100vw !important;
+ height:100vh !important;
+ max-width:none;
+ border-radius:0;
+ box-shadow:none;
+}
+
+</style>
+</head>
+
+<body>
+
+<!-- LOGIN -->
+<div class="wrapper" id="loginBox">
+<h2>Մուտք</h2>
+<input id="user" placeholder="Username">
+<input id="pass" type="password" placeholder="Password">
+<button id="loginBtn">Login</button>
+</div>
+
+<!-- USER SYSTEM -->
+<div class="wrapper" id="system">
+<div class="circle" id="circle"><div class="center" id="center"></div></div>
+<button id="enterBtn" style="display:none">Enter</button>
+</div>
+
+<!-- WORKSPACE -->
+<div class="wrapper" id="workspace">
+<h3>Ձեր մասնագիտությունները</h3>
+<div id="myList"></div>
+
+<button id="resetProfBtn" class="gray" style="display:none">
+Փոխել մասնագիտությունները
+</button>
+<div>
+<button onclick="logout()">Logout</button><i class='bx bx-log-in'></i>
+</div>
+</div>
+
+<div class="wrapper" id="professionPage">
+<h3 id="profTitle"></h3>
+<div id="profContent" class="small"></div> 
+<button onclick="back()">Back</button>
+</div>
+
+<!-- ADMIN -->
+<div class="wrapper" id="admin">
+<h3>ADMIN PANEL</h3>
+<button onclick="showUsers()">Блокирование аккаунтов</button>
+<button onclick="showAddProf()">Добавление профессии</button>
+<button onclick="showManage()">Управление страницами</button>
+<div id="adminContent"></div>
+<button class="gray" onclick="logout()">Logout</button>
+</div>
+
+<script>
+/* ===== DATA ===== */
+const ADMIN_USER="sergey",ADMIN_PASS="1234";
+let currentUser=null,selected=[];
+
+let professions=JSON.parse(localStorage.getItem("profs"))||[
+ "3D մոտելավորում","խաղերի ստեղծում","ռոբոտաշինություն",
+ "ծրագրավորում","գթուրթհըլ","վեբ կայքերի մշակում"
+];
+
+let pages=JSON.parse(localStorage.getItem("pages"))||{};
+let users=JSON.parse(localStorage.getItem("users"))||{};
+
+/* ===== ДОБАВЛЕНО: функция fullscreen (НИЧЕГО НЕ ЛОМАЕТ) ===== */
+function makeFullscreen(el){
+ document.body.style.alignItems="stretch";
+ document.body.style.justifyContent="stretch";
+ el.classList.add("fullscreen");
+}
+
+/* ===== LOGIN ===== */
+loginBtn.onclick = login;
+
+function login(){
+ const u=user.value.trim(), p=pass.value.trim();
+ if(!u||!p) return;
+
+ if(u===ADMIN_USER && p===ADMIN_PASS){
+  loginBox.style.display="none";
+  admin.style.display="block";
+  makeFullscreen(admin);
+  return;
+ }
+
+ if(users[u]?.blocked) return alert("Account blocked");
+
+ if(!users[u]) users[u]={password:p,choices:[]};
+ if(users[u].password!==p) return alert("Wrong password");
+
+ currentUser=u;
+ localStorage.setItem("users",JSON.stringify(users));
+ loginBox.style.display="none";
+
+ if(users[u].choices.length){
+  workspace.style.display="block";
+  makeFullscreen(workspace);
+  load();
+ }else{
+  system.style.display="block";
+  makeFullscreen(system);
+  draw();
+ }
+}
+
+/* ===== CIRCLE ===== */
+function draw(){
+ selected=[]; center.innerHTML=""; enterBtn.style.display="none";
+ document.querySelectorAll(".profession").forEach(e=>e.remove());
+ const R=170,C=210;
+ professions.forEach((n,i)=>{
+  const a=i/professions.length*Math.PI*2;
+  const d=document.createElement("div");
+  d.className="profession";
+  d.style.left=C+Math.cos(a)*R-32+"px";
+  d.style.top=C+Math.sin(a)*R-32+"px";
+  d.innerText=n;
+  d.onclick=()=>toggle(d,n);
+  circle.appendChild(d);
+ });
+}
+
+function toggle(el,n){
+ if(el.classList.contains("selected")){
+  el.classList.remove("selected");
+  selected=selected.filter(x=>x!==n);
+ }else if(selected.length<4){
+  el.classList.add("selected"); selected.push(n);
+ }
+ center.innerHTML="";
+ selected.forEach((s,i)=>{
+  let d=document.createElement("div");
+  d.className="c"+(i+1); d.innerText=s;
+  center.appendChild(d);
+ });
+ enterBtn.style.display=selected.length===4?"block":"none";
+}
+
+enterBtn.onclick=()=>{
+ users[currentUser].choices=[...selected];
+ localStorage.setItem("users",JSON.stringify(users));
+ system.style.display="none";
+ workspace.style.display="block";
+ makeFullscreen(workspace);
+ load();
+};
+
+/* ===== USER PAGES ===== */
+function load(){
+ myList.innerHTML="";
+ users[currentUser].choices.forEach(p=>{
+  let d=document.createElement("div");
+  d.className="item";
+  d.innerText=p;
+  d.onclick=()=>open(p);
+  myList.appendChild(d);
+ });
+
+ resetProfBtn.style.display =
+  users[currentUser].choices.length ? "block" : "none";
+}
+
+resetProfBtn.onclick=()=>{
+ users[currentUser].choices=[];
+ localStorage.setItem("users",JSON.stringify(users));
+ workspace.style.display="none";
+ system.style.display="block";
+ makeFullscreen(system);
+ draw();
+};
+
+function open(p){
+ workspace.style.display="none";
+ professionPage.style.display="block";
+ makeFullscreen(professionPage);
+ profTitle.innerText=p;
+ profContent.innerHTML=pages[p]||"Пока пусто";
+}
+
+function back(){
+ professionPage.style.display="none";
+ workspace.style.display="block";
+ makeFullscreen(workspace);
+}
+
+function logout(){location.reload();}
+
+/* ===== ADMIN ===== */
+function showUsers(){
+ adminContent.innerHTML="";
+ for(let u in users){
+  let d=document.createElement("div");
+  d.className="item";
+  d.innerHTML=`${u}
+   <button class="red" onclick="block('${u}')">Блок</button>
+   <button onclick="unblock('${u}')">Разблок</button>`;
+  adminContent.appendChild(d);
+ }
+}
+function block(u){users[u].blocked=true;saveUsers();}
+function unblock(u){delete users[u].blocked;saveUsers();}
+function saveUsers(){
+ localStorage.setItem("users",JSON.stringify(users));
+ showUsers();
+}
+
+function showAddProf(){
+ adminContent.innerHTML=`
+ <input id="np" placeholder="Название профессии">
+ <button onclick="addProf()">Enter</button>`;
+}
+function addProf(){
+ let v=np.value.trim();
+ if(v){
+  professions.push(v);
+  localStorage.setItem("profs",JSON.stringify(professions));
+  alert("Добавлено");
+ }
+}
+
+function showManage(){
+ adminContent.innerHTML="";
+ professions.forEach(p=>{
+  let d=document.createElement("div");
+  d.className="item";
+  d.innerText=p;
+  d.onclick=()=>openEditor(p);
+  adminContent.appendChild(d);
+ });
+}
+
+function openEditor(p){
+ adminContent.innerHTML=`
+ <h4>${p}</h4>
+ <div id="editor" contenteditable="true"
+  style="min-height:200px;border:1px solid #ccc;padding:10px;border-radius:8px">
+  ${pages[p]||""}
+ </div>
+ <button onclick="savePage('${p}')">💾 Сохранить</button>
+ <button class="gray" onclick="showManage()">⬅ Назад</button>
+ <p class="small">Можно вставлять HTML, iframe, img, video, ссылки</p>
+ `;
+}
+
+function savePage(p){
+ pages[p]=document.getElementById("editor").innerHTML;
+ localStorage.setItem("pages",JSON.stringify(pages));
+ alert("Сохранено");
+}
+</script>
+
+</body>
+</html>
